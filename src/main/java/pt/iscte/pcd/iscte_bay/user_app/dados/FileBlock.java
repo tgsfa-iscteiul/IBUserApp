@@ -1,6 +1,14 @@
-package pt.iscte.pcd.client;
+package pt.iscte.pcd.iscte_bay.user_app.dados;
 
-public class Block {
+import java.io.Serializable;
+
+/**
+ *  Informação acerca de uma parte de um ficheiro que será 
+ *  transferida de um Utilizador especifico
+ *  
+ * @author tomas
+ */
+public class FileBlock implements Serializable{
 
 	private FileDetails fileDetails;
 	private int offset;
@@ -8,7 +16,7 @@ public class Block {
 	
 	
 	
-	public Block(FileDetails details, int offset, int length) { 
+	public FileBlock(FileDetails details, int offset, int length) { 
 		fileDetails = details;
 		this.offset = offset;
 		this.length = length;

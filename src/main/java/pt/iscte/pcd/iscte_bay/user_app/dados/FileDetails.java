@@ -1,7 +1,13 @@
-package pt.iscte.pcd.client;
+package pt.iscte.pcd.iscte_bay.user_app.dados;
 
 import java.io.Serializable;
 
+/**
+ *  Informação acerca de um ficheiro a transferir
+ *  
+ * @author tomas
+ *
+ */
 public class FileDetails implements Serializable {
 
 	private String fileName;

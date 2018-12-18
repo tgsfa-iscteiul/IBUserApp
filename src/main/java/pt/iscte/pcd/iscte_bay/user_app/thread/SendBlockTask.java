@@ -1,7 +1,10 @@
-package pt.iscte.pcd.client;
+package pt.iscte.pcd.iscte_bay.user_app.thread;
 
 import java.io.IOException;
 import java.io.ObjectOutputStream;
+
+import pt.iscte.pcd.iscte_bay.user_app.dados.FileBlockRequestMessage;
+import pt.iscte.pcd.iscte_bay.user_app.dados.FilePart;
 
 public class SendBlockTask implements Runnable {
 
@@ -16,11 +19,13 @@ public class SendBlockTask implements Runnable {
 		this.fileContents = fileContents;
 		this.requestedBlock = requestedBlock;
 		this.out = out;
+		request = new byte[(int)requestedBlock.getBlock().getLength()];
 	}
 
 	@Override
 	public void run() {
 		fillRequest();
+		System.out.println("Filled request, sending block...");
 		FilePart f = new FilePart(request, offSet, size);
 		try {
 			out.writeObject(f);

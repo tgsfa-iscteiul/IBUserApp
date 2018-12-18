@@ -1,4 +1,4 @@
-package pt.iscte.pcd.client;
+package pt.iscte.pcd.iscte_bay.user_app.thread;
 
 
 
@@ -16,7 +16,8 @@ public class WorkerThread extends Thread {
 			Runnable task;
 			try {
 				task = threadPool.getTask();
-				task.run();
+				(new Thread(task)).start();
+				System.out.println("Ran task");
 				threadPool.updateTaskDoneNumber();
 			} catch (InterruptedException e) {
 				e.printStackTrace();

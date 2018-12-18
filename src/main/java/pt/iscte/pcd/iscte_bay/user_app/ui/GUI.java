@@ -1,4 +1,4 @@
-package pt.iscte.pcd.client;
+package pt.iscte.pcd.iscte_bay.user_app.ui;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
@@ -9,7 +9,6 @@ import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.IOException;
 import java.net.InetAddress;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
@@ -22,7 +21,19 @@ import javax.swing.JPanel;
 import javax.swing.JProgressBar;
 import javax.swing.JTextField;
 import javax.swing.WindowConstants;
+import javax.swing.event.ListSelectionEvent;
+import javax.swing.event.ListSelectionListener;
 
+import pt.iscte.pcd.iscte_bay.user_app.Client;
+import pt.iscte.pcd.iscte_bay.user_app.dados.ClientConnector;
+import pt.iscte.pcd.iscte_bay.user_app.dados.FileDetails;
+
+/**
+ * Ponto de entrada e implementação do Inteface com o Utilizador
+ * 
+ * @author tomas
+ *
+ */
 public class GUI {
 
 	private Client client;
@@ -34,22 +45,22 @@ public class GUI {
 	private DefaultListModel<String> listModel = new DefaultListModel<>();
 	private JProgressBar progressBar;
 	private JLabel label;
+	private String selectedFromList = null;
+	private HashMap<FileDetails, List<ClientConnector>> files = new HashMap<FileDetails, List<ClientConnector>>();
 
 	public GUI(InetAddress directoryAddress, int directoryPort, int userPort, String filesFolder) {
 
 		frame = new JFrame("The Iscte Bay");
-
 		frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
-
 		frame.setLayout(new BorderLayout());
 		// frame.setBackground(Color.BLUE);
 		frame.setPreferredSize(new Dimension(400, 250));
 		addFrameContent();
-
 		frame.pack();
 
-		client = new Client( directoryAddress,  directoryPort,  userPort,  filesFolder );
-		
+		client = new Client(directoryAddress, directoryPort, userPort, filesFolder);
+
+		// Provavelmente será aqui que se deve usar uma worker thread do swing
 		try {
 			client.runClient();
 		} catch (IOException e) {
@@ -109,6 +120,7 @@ public class GUI {
 	 * adds all necessary listeners for buttons
 	 */
 	public void addActionListeners() {
+
 		frame.addWindowListener(new WindowAdapter() {
 			@Override
 			public void windowClosing(WindowEvent windowEvent) {
@@ -121,32 +133,59 @@ public class GUI {
 				}
 			}
 		});
+
 		searchButton.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent actionEvent) {
-				try {
-					if (textField.getText().isEmpty()) {
-						ArrayList<String> userList = client.requestRegisteredUsers();
-						for (String s : userList) {
-							listModel.addElement(s);
+				if (!textField.getText().isEmpty()) {
+					listModel.clear();
+					try {
+						client.sendFileNameRequest(textField.getText());
+						files = client.getUsersFilesMap();
+					} catch (Exception e) {
+						e.printStackTrace();
+					}
+					if (files != null) {
+						for (FileDetails fd : files.keySet()) {
+							int numClients = files.get(fd).size();
+							listModel.addElement(fd.getFileName() + " (" + numClients + ")");
 						}
 					} else {
-						try {
-							HashMap<FileDetails, List<ClientConnector>> files = client
-									.sendFileNameRequest(textField.getText());
-							for (FileDetails fd : files.keySet()) {
-								int numClients = files.get(fd).size();
-								listModel.addElement(fd.getFileName() + " (" + numClients + ")");
-							}
-						} catch (Exception e) {
-							e.printStackTrace();
-						}
+						listModel.addElement("No users available with file");
 					}
-				} catch (IOException e) {
-					e.printStackTrace();
 				}
 			}
 		});
+
+		downloadButton.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				System.out.println("Clicked download button");
+				if (selectedFromList != null) {
+					System.out.println("Selected not null");
+					for (FileDetails f : files.keySet()) {
+						String fileName = selectedFromList.replaceAll("\\s*\\(\\d+\\)", ""); //filtra os parenteses e numero de users
+						if (f.getFileName().equals(fileName)) {
+							System.out.println("Found file. Making request ...");
+							client.requestFileParts(f);
+							break;
+						}
+					}
+				}
+			}
+		});
+
+		searchResultList.addListSelectionListener(new ListSelectionListener() {
+
+			public void valueChanged(ListSelectionEvent evt) {
+				if (evt.getValueIsAdjusting())
+					return;
+				
+				selectedFromList = searchResultList.getSelectedValue();
+				System.out.println(selectedFromList);
+			}
+		});
+
 	}
 
 }

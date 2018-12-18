@@ -1,4 +1,4 @@
-package pt.iscte.pcd.client;
+package pt.iscte.pcd.iscte_bay.user_app.thread;
 
 public class BlockThreadPool {
 
@@ -16,15 +16,15 @@ public class BlockThreadPool {
 	}
 	
 	
-	public synchronized void submit(Runnable taskToDo) {
+	public void submit(Runnable taskToDo) {
 		tasks.add(taskToDo);
 	}
 
-	public synchronized Runnable getTask() throws InterruptedException {
+	public  Runnable getTask() throws InterruptedException {
 		return tasks.take();
 	}
 
-	public synchronized void updateTaskDoneNumber() {
+	public  void updateTaskDoneNumber() {
 		numTasksDone++;
 	}
 }

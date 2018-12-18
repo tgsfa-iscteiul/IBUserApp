@@ -1,4 +1,4 @@
-package pt.iscte.pcd.client;
+package pt.iscte.pcd.iscte_bay.user_app;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
@@ -15,13 +15,30 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 
+import pt.iscte.pcd.iscte_bay.user_app.dados.ClientConnector;
+import pt.iscte.pcd.iscte_bay.user_app.dados.FileBlock;
+import pt.iscte.pcd.iscte_bay.user_app.dados.FileDetails;
+import pt.iscte.pcd.iscte_bay.user_app.dados.WordSearchMessage;
+import pt.iscte.pcd.iscte_bay.user_app.thread.BlockGetterTask;
+import pt.iscte.pcd.iscte_bay.user_app.thread.BlockThreadPool;
+import pt.iscte.pcd.iscte_bay.user_app.thread.SingleBarrier;
+import pt.iscte.pcd.iscte_bay.user_app.thread.WriteFileThread;
+
+/**
+ * Implementação das funcionalidades de cliente, ou seja tudo o que se relaciona
+ * com a comunicação efectuada por iniciativa da UserApp com outros Utilizadores
+ * e com o directório.
+ * 
+ * @author tomas
+ *
+ */
 public class Client {
 
 	private InetAddress directoryAddress;
 	private int directoryPort;
 	private int userPort;
 	private String filesFolder;
-	
+
 	private InetAddress userAddress;
 	private Socket directorySocket;
 
@@ -33,33 +50,32 @@ public class Client {
 	private ArrayList<String> userList;
 	private ArrayList<ClientConnector> connectionsList;
 	private HashMap<FileDetails, List<ClientConnector>> usersFilesMap;
-	private ArrayList<Block> blockList;
+	private ArrayList<FileBlock> blockList;
 
 	private WordSearchMessage word;
 	private byte[] wholeFile; // each block needs to be added to this array
 
 	public static final int FILEBLOCKSIZE = 1024;
 
-
 	public Client(InetAddress directoryAddress, int directoryPort, int userPort, String filesFolder) {
 		this.directoryAddress = directoryAddress;
 		this.directoryPort = directoryPort;
 		this.userPort = userPort;
 		this.filesFolder = filesFolder;
-		
-		connectionsList = new ArrayList<>();
+
 		blockList = new ArrayList<>();
+		
 	}
 
 	public void runClient() throws IOException {
 		try {
 			connectToDirectory();
 			registerInDirectory();
-			new ClientServer(userPort).start(); // deve ser iniciado aqui ?
+			// requestRegisteredUsers();
+			new UserAppServer(userPort).start(); // deve ser iniciado aqui ?
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-
 	}
 
 	/**
@@ -68,7 +84,7 @@ public class Client {
 	 * @throws IOException
 	 */
 	private void connectToDirectory() throws IOException {
-		//address = InetAddress.getByName(null);
+		// address = InetAddress.getByName(null);
 		System.out.println("Endereco = " + directoryAddress);
 		directorySocket = new Socket(directoryAddress, directoryPort);
 		System.out.println("Socket = " + directorySocket);
@@ -82,8 +98,8 @@ public class Client {
 	 * @throws IOException
 	 */
 	private void registerInDirectory() throws IOException {
-		//  devolve o porto que esta a lançar ? 
-		out.println("INSC " + "Nome " + directorySocket.getLocalAddress().getHostAddress() + " " + userPort);
+		// devolve o porto que esta a lançar ?
+		out.println("INSC " + directorySocket.getLocalAddress().getHostAddress() + " " + userPort);
 
 		try {
 			Thread.sleep(1000);
@@ -96,81 +112,26 @@ public class Client {
 	/**
 	 * makes a request to the server for registered users
 	 */
-	public ArrayList<String> requestRegisteredUsers() throws IOException {
+	private void requestRegisteredUsers() throws IOException {
 		out.println("CLT");
 		userList = new ArrayList<>();
 		String str = null;
-		do { // lists users registered in directory
+		do { // get users registered in directory
 			str = in.readLine();
+			System.out.println(str);
 			userList.add(str);
 		} while (!str.equals("END"));
-		return userList;
 	}
 
 	/**
-	 * makes a request to other users for a file with a certain keyword
+	 * makes a connection with the users received from directory, saves the streams
+	 * and socket in list for future communication
 	 * 
-	 * @param fileName
+	 * @throws IOException
 	 */
-	public HashMap<FileDetails, List<ClientConnector>> sendFileNameRequest(String fileName) throws Exception {
-		word = new WordSearchMessage(fileName);
-		usersFilesMap = new HashMap<FileDetails, List<ClientConnector>>();
-		connectToUsers();
-		ArrayList<FileDetails> listFromPeer = new ArrayList<>();
-		for (ClientConnector c : connectionsList) {
-			c.getOutputStream().writeObject(word);
-			listFromPeer = (ArrayList<FileDetails>) c.getInputStream().readObject();
-			if (!listFromPeer.isEmpty()) {
-				// filesWithKeyword.addAll(listFromPeer);
-				for (FileDetails file : listFromPeer) {
-					if (usersFilesMap.containsKey(file)) {
-						usersFilesMap.get(file).add(c);
-					} else { // REVER !
-						ArrayList<ClientConnector> usersWithFile = new ArrayList<ClientConnector>();
-						usersWithFile.add(c);
-						usersFilesMap.put(file, usersWithFile);
-					}
-				}
-			}
-		}
-		return usersFilesMap;
-	}
-
-	public void requestFileParts(FileDetails fileDetails) {
-		sortFileBlocks(fileDetails);
-		ArrayList<ClientConnector> usersHavingFile = new ArrayList<ClientConnector>(usersFilesMap.get(fileDetails));
-		int numberOfThreads = usersHavingFile.size(); // creates 1 worker thread per user having file
-		BlockThreadPool threadPool = new BlockThreadPool(numberOfThreads);
-		SingleBarrier singleBarrier = new SingleBarrier(blockList.size());
-		WriteFileThread writingThread = new WriteFileThread(singleBarrier, wholeFile, fileDetails.getFileName());
-		writingThread.run();
-		for (Block b : blockList) { // creates as many tasks threads as there are blocks to be downloaded
-			threadPool.submit(new BlockGetterTask(b, usersHavingFile, singleBarrier, wholeFile));
-		}
-	}
-
-	private void sortFileBlocks(FileDetails fileDetails) {
-		Block block;
-		int totalLength = (int) fileDetails.getFileSize();
-
-		int lastBlockLength = totalLength % FILEBLOCKSIZE;
-		int lastBlockOffset = totalLength - lastBlockLength;
-
-		int offset = 0;
-
-		while (offset < totalLength) {
-			if (offset >= lastBlockOffset) {
-				block = new Block(fileDetails, lastBlockOffset, lastBlockLength);
-			} else {
-				block = new Block(fileDetails, offset, FILEBLOCKSIZE); // 0-1023 ou 1-1024 ? 1024 incluido ?
-			}
-			offset = offset + FILEBLOCKSIZE + 1;
-			// regiao critica ?
-			blockList.add(block);
-		}
-	}
-
-	private void connectToUsers() throws IOException {
+	private void connectToUsers() throws IOException { // PROBLEMA a conexao de um user que ja se tenha desconetado
+		requestRegisteredUsers();
+		connectionsList = new ArrayList<ClientConnector>(); // refaz a lista de conexoes
 		for (String s : userList) {
 			if (!s.equals("END")) {
 				String split[] = s.split(" ");
@@ -188,15 +149,89 @@ public class Client {
 	}
 
 	private boolean canConnect(InetAddress ip, int port) {
-		if (this.userPort == port &&  directorySocket.getLocalAddress() == ip) {
-			return false;
-		}
-		for (ClientConnector c : connectionsList) {
-			if (c.getSocket().getInetAddress().equals(ip) && c.getSocket().getLocalPort() == port) {
+
+		if (this.userPort == port && directorySocket.getLocalAddress().equals(ip))
+			return false; // impede a ligacao a si proprio
+		for (ClientConnector c : connectionsList) { // verifica se já não está ligado ao user NAO FUNCIONA ?
+			if (c.getSocket().getInetAddress().equals(ip) && c.getSocket().getPort() == port)
 				return false;
-			}
 		}
 		return true;
+	}
+
+	/**
+	 * makes a request to other users for a file with a certain keyword, saves the
+	 * files with a specific keyword
+	 * 
+	 * @param fileName
+	 */
+	public void sendFileNameRequest(String fileName) throws Exception {
+		word = new WordSearchMessage(fileName);
+		usersFilesMap = new HashMap<FileDetails, List<ClientConnector>>();
+		connectToUsers(); // Se se conseguiu ligar a pelo menos 1 user, envia o hashMap
+		if (!connectionsList.isEmpty()) {
+			ArrayList<FileDetails> listFromPeer = new ArrayList<>();
+			for (ClientConnector c : connectionsList) {
+				c.getOutputStream().writeObject(word);
+				listFromPeer = (ArrayList<FileDetails>) c.getInputStream().readObject();
+				if (!listFromPeer.isEmpty()) {
+					// filesWithKeyword.addAll(listFromPeer);
+					for (FileDetails file : listFromPeer) {
+						if (usersFilesMap.containsKey(file)) {
+							usersFilesMap.get(file).add(c);
+						} else { // REVER !
+							ArrayList<ClientConnector> usersWithFile = new ArrayList<ClientConnector>();
+							usersWithFile.add(c);
+							usersFilesMap.put(file, usersWithFile);
+						}
+					}
+				}
+			}
+		}
+	}
+
+	public HashMap<FileDetails, List<ClientConnector>> getUsersFilesMap() {
+		if (!usersFilesMap.isEmpty())
+			return usersFilesMap;
+		return null;
+	}
+
+	public void requestFileParts(FileDetails fileDetails) {
+		sortFileBlocks(fileDetails);
+		ArrayList<ClientConnector> usersHavingFile = new ArrayList<ClientConnector>(usersFilesMap.get(fileDetails));
+		int numberOfThreads = usersHavingFile.size(); // creates 1 worker thread per user having file
+		BlockThreadPool threadPool = new BlockThreadPool(numberOfThreads);
+		SingleBarrier singleBarrier = new SingleBarrier(blockList.size());
+		WriteFileThread writingThread = new WriteFileThread(singleBarrier, wholeFile, fileDetails.getFileName(), filesFolder);
+		writingThread.start();
+		int i = 0 ;
+		for (FileBlock b : blockList) { // creates as many task threads as there are blocks to be downloaded
+			System.out.println("Submit : block " + i );
+//			threadPool.submit(new BlockGetterTask(b, usersHavingFile, singleBarrier, wholeFile));
+			i++;
+		}
+	}
+
+	private void sortFileBlocks(FileDetails fileDetails) {
+		FileBlock block;
+		int totalLength = (int) fileDetails.getFileSize();
+		wholeFile = new  byte[totalLength];
+
+		int lastBlockLength = totalLength % FILEBLOCKSIZE;
+		int lastBlockOffset = totalLength - lastBlockLength;
+
+		int offset = 0;
+
+		while (offset < totalLength) {
+			if (offset >= lastBlockOffset) {
+				block = new FileBlock(fileDetails, lastBlockOffset, lastBlockLength);
+			} else {
+				block = new FileBlock(fileDetails, offset, FILEBLOCKSIZE); // 0-1023 ou 1-1024 ? 1024 incluido ?
+			}
+			offset = offset + FILEBLOCKSIZE + 1;
+			// regiao critica ?
+			blockList.add(block);
+		}
 	}
 
 	/**

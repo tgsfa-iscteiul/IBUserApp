@@ -1,9 +1,15 @@
-package pt.iscte.pcd.client;
+package pt.iscte.pcd.iscte_bay.user_app.dados;
 
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.net.Socket;
 
+/**
+ *  Dados de uma ligação a um cliente
+ *  
+ * @author tomas
+ *
+ */
 public class ClientConnector {
 	
 	private Socket socket;

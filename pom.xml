@@ -17,7 +17,7 @@
 				<configuration>
 					<archive>
 						<manifest>
-							<mainClass>pt.iscte.pcd.client.MainClient</mainClass>
+							<mainClass>pt.iscte.pcd.iscte_bay.user_app.MainUserApp</mainClass>
 						</manifest>
 					</archive>
 				</configuration>

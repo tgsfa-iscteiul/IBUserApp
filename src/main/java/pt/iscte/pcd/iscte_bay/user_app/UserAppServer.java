@@ -1,17 +1,33 @@
-package pt.iscte.pcd.client;
+package pt.iscte.pcd.iscte_bay.user_app;
 
 import java.io.IOException;
 import java.net.ServerSocket;
 import java.net.Socket;
 
-public class ClientServer extends Thread {
+import pt.iscte.pcd.iscte_bay.user_app.thread.BlockThreadPool;
+
+/**
+ *  Comunicações com outros Utilizadores após estes terem perguntado ao directório 
+ *  quais os clientes que estão ligados.
+ *  
+ *  São server sockets, a responder num port e sempre que outra UserApp pretende 
+ *  saber que ficheiros existem ou solicitar a transferência de um ficheiros
+ *  
+ *  Sempre que um pedido de comunicação é efectuado à Server Socket, é lançada 
+ *  uma nova thread na qual são dadas as respostas aquele utilizador sem bloquear
+ *  outros pedidos de outros utilizadores que entretanto surgam.
+ *   
+ * @author tomas
+ *
+ */
+public class UserAppServer extends Thread {
 
 	private Socket socket;
 	private ServerSocket serverSocket;
 	private int port;
 	private BlockThreadPool threadPool;
 
-	public ClientServer(int port) {
+	public UserAppServer(int port) {
 		this.port = port;
 		threadPool = new BlockThreadPool(5);
 	}

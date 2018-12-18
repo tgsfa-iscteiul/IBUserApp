@@ -1,6 +1,13 @@
-package pt.iscte.pcd.client;
+package pt.iscte.pcd.iscte_bay.user_app.dados;
 
-public class FilePart {
+import java.io.Serializable;
+
+/**
+ *  Parte de um ficheiro transferido entre dois clientes
+ *  
+ * @author tomas
+ */
+public class FilePart implements Serializable{
 
 	private byte[] filePart;
 	private int offSet;

@@ -1,4 +1,4 @@
-package pt.iscte.pcd.client;
+package pt.iscte.pcd.iscte_bay.user_app.dados;
 
 import java.io.Serializable;
 
