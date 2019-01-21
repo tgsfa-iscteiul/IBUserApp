@@ -7,8 +7,8 @@ import java.io.Serializable;
  *  
  * @author tomas
  */
-public class FilePart implements Serializable{
-
+@SuppressWarnings("serial")
+public class FilePart implements Serializable, Comparable<FilePart>{
 	private byte[] filePart;
 	private int offSet;
 	private int size;
@@ -34,5 +34,10 @@ public class FilePart implements Serializable{
 		return size;
 	}
 	
+	@Override
+	public int compareTo(FilePart fp) {  // DA EXCECAO
+		return offSet - fp.offSet;
+	}
 	
+		
 }

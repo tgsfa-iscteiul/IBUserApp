@@ -5,18 +5,14 @@ import java.util.Queue;
 
 public class TaskBlockingQueue {
 
-	private Queue<Runnable> tasks = new LinkedList<Runnable>();
+	private final Queue<Object> tasks = new LinkedList<Object>();
 
-	public synchronized void add(Runnable r) {
-		System.out.println("Vou adcionar task ");
+	public synchronized void add(Object r) {
 		tasks.add(r);
 		notifyAll();
-		System.out.println(" notifiquei todos task ");
-
 	}
 
-	public synchronized Runnable take() throws InterruptedException {
-		System.out.println("taking from blocking queue");
+	public synchronized Object take() throws InterruptedException {
 		while (tasks.isEmpty()) {
 			try {
 				wait();
@@ -24,10 +20,13 @@ public class TaskBlockingQueue {
 				System.out.println("Fui interrompido. TASKBLOCKINGQUEUE");
 			}
 		}
-		Runnable r = tasks.remove();
-		System.out.println("took from blocking queue");
-
+		Object r = tasks.remove();
+		notifyAll();
 		return r;
+	}
+	
+	public int getSize() {
+		return tasks.size();
 	}
 
 }

@@ -9,19 +9,28 @@ import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
+import java.lang.reflect.Array;
 import java.net.InetAddress;
 import java.net.Socket;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 
+import pt.iscte.pcd.iscte_bay.file_transfer.FileAssemble;
 import pt.iscte.pcd.iscte_bay.user_app.dados.ClientConnector;
 import pt.iscte.pcd.iscte_bay.user_app.dados.FileBlock;
+import pt.iscte.pcd.iscte_bay.user_app.dados.FileBlockRequestMessage;
 import pt.iscte.pcd.iscte_bay.user_app.dados.FileDetails;
+import pt.iscte.pcd.iscte_bay.user_app.dados.FilePart;
 import pt.iscte.pcd.iscte_bay.user_app.dados.WordSearchMessage;
 import pt.iscte.pcd.iscte_bay.user_app.thread.BlockGetterTask;
 import pt.iscte.pcd.iscte_bay.user_app.thread.BlockThreadPool;
 import pt.iscte.pcd.iscte_bay.user_app.thread.SingleBarrier;
+import pt.iscte.pcd.iscte_bay.user_app.thread.TaskBlockingQueue;
 import pt.iscte.pcd.iscte_bay.user_app.thread.WriteFileThread;
 
 /**
@@ -51,20 +60,24 @@ public class Client {
 	private ArrayList<ClientConnector> connectionsList;
 	private HashMap<FileDetails, List<ClientConnector>> usersFilesMap;
 	private ArrayList<FileBlock> blockList;
+	private ArrayList<ClientConnector> usersHavingFile;
+	private ArrayList<FilePart> blocksToWrite;
+
+	private int numberOfBlocks;
 
 	private WordSearchMessage word;
 	private byte[] wholeFile; // each block needs to be added to this array
 
 	public static final int FILEBLOCKSIZE = 1024;
 
-	public Client(InetAddress directoryAddress, int directoryPort, int userPort, String filesFolder) {
+	public Client(InetAddress directoryAddress, int directoryPort, int userPort, String folderName) {
 		this.directoryAddress = directoryAddress;
 		this.directoryPort = directoryPort;
 		this.userPort = userPort;
-		this.filesFolder = filesFolder;
+		this.filesFolder = folderName;
 
-		blockList = new ArrayList<>();
-		
+		numberOfBlocks = 0;
+
 	}
 
 	public void runClient() throws IOException {
@@ -72,7 +85,7 @@ public class Client {
 			connectToDirectory();
 			registerInDirectory();
 			// requestRegisteredUsers();
-			new UserAppServer(userPort).start(); // deve ser iniciado aqui ?
+			new UserAppServer(userPort, filesFolder).start(); // deve ser iniciado aqui ?
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
@@ -110,7 +123,8 @@ public class Client {
 	}
 
 	/**
-	 * makes a request to the server for registered users
+	 * Makes a request to the server for registered users and adds them to a list of
+	 * users
 	 */
 	private void requestRegisteredUsers() throws IOException {
 		out.println("CLT");
@@ -148,6 +162,9 @@ public class Client {
 		}
 	}
 
+	/**
+	 * Para que o programa não se conecte a si próprio
+	 */
 	private boolean canConnect(InetAddress ip, int port) {
 
 		if (this.userPort == port && directorySocket.getLocalAddress().equals(ip))
@@ -196,27 +213,33 @@ public class Client {
 		return null;
 	}
 
-	public void requestFileParts(FileDetails fileDetails) {
-		sortFileBlocks(fileDetails);
-		ArrayList<ClientConnector> usersHavingFile = new ArrayList<ClientConnector>(usersFilesMap.get(fileDetails));
+	public void requestFileParts(FileDetails fileDetails) throws InterruptedException {
+//		wholeFile = new byte[(int) fileDetails.getFileSize()];
+		createBlocks(fileDetails);
+		usersHavingFile = new ArrayList<ClientConnector>(usersFilesMap.get(fileDetails));
+		blocksToWrite = new ArrayList<FilePart>();
+
 		int numberOfThreads = usersHavingFile.size(); // creates 1 worker thread per user having file
+		System.out.println("Number of workers " + numberOfThreads);
 		BlockThreadPool threadPool = new BlockThreadPool(numberOfThreads);
 		SingleBarrier singleBarrier = new SingleBarrier(blockList.size());
-		WriteFileThread writingThread = new WriteFileThread(singleBarrier, wholeFile, fileDetails.getFileName(), filesFolder);
-		writingThread.start();
-		int i = 0 ;
-		for (FileBlock b : blockList) { // creates as many task threads as there are blocks to be downloaded
-			System.out.println("Submit : block " + i );
-//			threadPool.submit(new BlockGetterTask(b, usersHavingFile, singleBarrier, wholeFile));
-			i++;
+		for (FileBlock fb : blockList) {
+			BlockGetterTask getFile = new BlockGetterTask(fb, singleBarrier, usersHavingFile, blocksToWrite);
+			threadPool.submit(getFile);
 		}
+
+		singleBarrier.barrierWait(); // waits while all tasks aren't finished
+		System.out.println("Passed the barrier : " + blocksToWrite);
+		Collections.sort(blocksToWrite);
+		WriteFileThread writingThread = new WriteFileThread(fileDetails, blocksToWrite, filesFolder);
+		writingThread.start();
+
 	}
 
-	private void sortFileBlocks(FileDetails fileDetails) {
+	private void createBlocks(FileDetails fd) {
+		blockList = new ArrayList<FileBlock>();
 		FileBlock block;
-		int totalLength = (int) fileDetails.getFileSize();
-		wholeFile = new  byte[totalLength];
-
+		int totalLength = (int) fd.getFileSize();
 		int lastBlockLength = totalLength % FILEBLOCKSIZE;
 		int lastBlockOffset = totalLength - lastBlockLength;
 
@@ -224,15 +247,17 @@ public class Client {
 
 		while (offset < totalLength) {
 			if (offset >= lastBlockOffset) {
-				block = new FileBlock(fileDetails, lastBlockOffset, lastBlockLength);
+				block = new FileBlock(fd.getFileName(), lastBlockOffset, lastBlockLength, (int) fd.getFileSize());
 			} else {
-				block = new FileBlock(fileDetails, offset, FILEBLOCKSIZE); // 0-1023 ou 1-1024 ? 1024 incluido ?
+				block = new FileBlock(fd.getFileName(), offset, FILEBLOCKSIZE, (int) fd.getFileSize()); // 0-1023 ou
+																										// 1-1024 ? 1024
+																										// incluido ?
 			}
-			offset = offset + FILEBLOCKSIZE + 1;
-			// regiao critica ?
+			offset = offset + FILEBLOCKSIZE;
 			blockList.add(block);
 		}
 	}
+
 
 	/**
 	 * TODO : Rever se o metodo deve ser static ou se deve estar aqui (mudar para
@@ -246,18 +271,7 @@ public class Client {
 		return files;
 	}
 
-	// public void startServing() throws IOException {
-	// serverSocket = new ServerSocket(PORT);
-	// try {
-	// while (true) {
-	// Socket socket = serverSocket.accept();
-	// System.out.println("Conex�o aceite: " + socket);
-	// new DealWithClient(socket, userTable).start();
-	// }
-	// } finally {
-	// serverSocket.close();
-	// }
-	// }
+
 
 	/**
 	 * closes directory socket

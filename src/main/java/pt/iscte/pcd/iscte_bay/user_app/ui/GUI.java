@@ -53,7 +53,6 @@ public class GUI {
 		frame = new JFrame("The Iscte Bay");
 		frame.setDefaultCloseOperation(WindowConstants.EXIT_ON_CLOSE);
 		frame.setLayout(new BorderLayout());
-		// frame.setBackground(Color.BLUE);
 		frame.setPreferredSize(new Dimension(400, 250));
 		addFrameContent();
 		frame.pack();
@@ -167,7 +166,12 @@ public class GUI {
 						String fileName = selectedFromList.replaceAll("\\s*\\(\\d+\\)", ""); //filtra os parenteses e numero de users
 						if (f.getFileName().equals(fileName)) {
 							System.out.println("Found file. Making request ...");
-							client.requestFileParts(f);
+							try {
+								client.requestFileParts(f);
+							} catch (InterruptedException e1) {
+								// TODO Auto-generated catch block
+								e1.printStackTrace();
+							}
 							break;
 						}
 					}

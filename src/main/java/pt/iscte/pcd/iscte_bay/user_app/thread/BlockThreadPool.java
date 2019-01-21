@@ -16,11 +16,11 @@ public class BlockThreadPool {
 	}
 	
 	
-	public void submit(Runnable taskToDo) {
+	public void submit(Object taskToDo) {
 		tasks.add(taskToDo);
 	}
 
-	public  Runnable getTask() throws InterruptedException {
+	public  Object getTask() throws InterruptedException {
 		return tasks.take();
 	}
 

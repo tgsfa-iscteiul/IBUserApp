@@ -25,10 +25,12 @@ public class UserAppServer extends Thread {
 	private Socket socket;
 	private ServerSocket serverSocket;
 	private int port;
+	private String folderName;
 	private BlockThreadPool threadPool;
 
-	public UserAppServer(int port) {
+	public UserAppServer(int port, String folderName) {
 		this.port = port;
+		this.folderName = folderName;
 		threadPool = new BlockThreadPool(5);
 	}
 
@@ -49,7 +51,7 @@ public class UserAppServer extends Thread {
 					e.printStackTrace();
 				}
 				System.out.println("Conexao aceite de client na socket: " + socket);
-				new ClientDealer(socket, threadPool).start();
+				new ClientDealer(socket, threadPool, folderName).start();
 			}
 		} finally {
 			try {

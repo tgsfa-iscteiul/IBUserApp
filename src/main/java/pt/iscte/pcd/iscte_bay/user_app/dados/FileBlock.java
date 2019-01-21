@@ -10,41 +10,50 @@ import java.io.Serializable;
  */
 public class FileBlock implements Serializable{
 
-	private FileDetails fileDetails;
+	// TODO  : FileDetails not necessary
+	private String fileName;
 	private int offset;
+	private int offsetEnd;
 	private int length;
+	private Integer fileTotalLength;
 	
 	
 	
-	public FileBlock(FileDetails details, int offset, int length) { 
-		fileDetails = details;
+	public FileBlock(String name, int offset, int length, Integer fileTotalLength) { 
+		fileName = name;
 		this.offset = offset;
 		this.length = length;
+		this.offsetEnd = this.offset + this.length;
+		this.fileTotalLength = fileTotalLength;
+	}
+
+	public FileBlock( int offset, int length) {
+		this(null,offset,length, null);
+	}
+
+
+	public String getName() {
+		return fileName;
 	}
 
 
 
-	public FileDetails getFileDetails() {
-		return fileDetails;
-	}
-
-
-
-	public long getOffset() {
+	public int getOffset() {
 		return offset;
 	}
 
 
 
-	public long getLength() {
+	public int getLength() {
 		return length;
 	}
 
-
-
-
-
-
+	public int getOffsetEnd() {
+		return offsetEnd;
+	}
 	
+	public int getFileTotalLength() {
+		return fileTotalLength;
+	}
 	
 }

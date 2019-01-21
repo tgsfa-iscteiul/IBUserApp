@@ -15,9 +15,8 @@ public class WorkerThread extends Thread {
 		while (!interrupted()) {
 			Runnable task;
 			try {
-				task = threadPool.getTask();
+				task =(Runnable) threadPool.getTask();
 				(new Thread(task)).start();
-				System.out.println("Ran task");
 				threadPool.updateTaskDoneNumber();
 			} catch (InterruptedException e) {
 				e.printStackTrace();
