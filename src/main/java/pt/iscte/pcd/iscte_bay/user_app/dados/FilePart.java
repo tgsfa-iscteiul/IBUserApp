@@ -7,11 +7,12 @@ import java.io.Serializable;
  *  
  * @author tomas
  */
-@SuppressWarnings("serial")
+//@SuppressWarnings("serial")
 public class FilePart implements Serializable, Comparable<FilePart>{
 	private byte[] filePart;
 	private int offSet;
 	private int size;
+	private ClientConnector sourceUser;
 	
 	
 	
@@ -32,6 +33,10 @@ public class FilePart implements Serializable, Comparable<FilePart>{
 	
 	public int getSize() {
 		return size;
+	}
+	
+	public void setSourceUser(ClientConnector sourceUser) {
+		this.sourceUser = sourceUser;
 	}
 	
 	@Override

@@ -19,7 +19,6 @@ import pt.iscte.pcd.iscte_bay.user_app.thread.TaskBlockingQueue;
  */
 public class FileDisassemble {
 	private File fileToTransfer;
-	private FileDetails fileDetails;
 	private List<FilePart> fileParts;
 	private List<FileBlock> fileBlocks;
 	private byte[] fileContents;
@@ -100,20 +99,4 @@ public class FileDisassemble {
 		return fileParts;
 	}
 
-	// TODO : Remove as soon as possible
-	public static void main(String args[]) throws Exception {
-		File transferFile = new File("/home/tomas/eclipse-workspace/IBUserApp/files2/roterdam.jpg");
-		FileDetails fileDetails = new FileDetails(transferFile.getName(), (int)transferFile.length());
-		FileDisassemble fd = new FileDisassemble(transferFile);
-		
-		SingleBarrier singleBarrier = new SingleBarrier(fd.getFileParts().size());
-		TaskBlockingQueue waitingParts = new TaskBlockingQueue();
-        FileReceiver fileReceiver = new FileReceiver(singleBarrier, waitingParts, fd);
-        fileReceiver.start();
-        System.out.println("Waiting to file to be complete");
-		singleBarrier.barrierWait(); 
-		System.out.println("File complete. Going to Assemble");
-		FileAssemble fa = new FileAssemble(fileDetails, fd.getFileParts());
-		fa.assembleFile();
-	}
 }

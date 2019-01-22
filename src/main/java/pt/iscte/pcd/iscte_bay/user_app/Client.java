@@ -48,7 +48,6 @@ public class Client {
 	private int userPort;
 	private String filesFolder;
 
-	private InetAddress userAddress;
 	private Socket directorySocket;
 
 	private BufferedReader in;
@@ -63,10 +62,8 @@ public class Client {
 	private ArrayList<ClientConnector> usersHavingFile;
 	private ArrayList<FilePart> blocksToWrite;
 
-	private int numberOfBlocks;
 
 	private WordSearchMessage word;
-	private byte[] wholeFile; // each block needs to be added to this array
 
 	public static final int FILEBLOCKSIZE = 1024;
 
@@ -76,7 +73,6 @@ public class Client {
 		this.userPort = userPort;
 		this.filesFolder = folderName;
 
-		numberOfBlocks = 0;
 
 	}
 
@@ -84,20 +80,18 @@ public class Client {
 		try {
 			connectToDirectory();
 			registerInDirectory();
-			// requestRegisteredUsers();
-			new UserAppServer(userPort, filesFolder).start(); // deve ser iniciado aqui ?
+			new UserAppServer(userPort, filesFolder).start();
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 	}
 
 	/**
-	 * connects to server opening the input/output channel between client and server
+	 * liga-se ao diretorio
 	 * 
 	 * @throws IOException
 	 */
 	private void connectToDirectory() throws IOException {
-		// address = InetAddress.getByName(null);
 		System.out.println("Endereco = " + directoryAddress);
 		directorySocket = new Socket(directoryAddress, directoryPort);
 		System.out.println("Socket = " + directorySocket);
@@ -106,25 +100,17 @@ public class Client {
 	}
 
 	/**
-	 * registers the user in directory
+	 * regista-se no diretorio
 	 * 
 	 * @throws IOException
 	 */
 	private void registerInDirectory() throws IOException {
-		// devolve o porto que esta a lançar ?
 		out.println("INSC " + directorySocket.getLocalAddress().getHostAddress() + " " + userPort);
-
-		try {
-			Thread.sleep(1000);
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-
 	}
 
 	/**
-	 * Makes a request to the server for registered users and adds them to a list of
-	 * users
+	 * pede ao servidor os clientes inscritos no
+	 * diretorio e adiciona a lista
 	 */
 	private void requestRegisteredUsers() throws IOException {
 		out.println("CLT");
@@ -132,20 +118,19 @@ public class Client {
 		String str = null;
 		do { // get users registered in directory
 			str = in.readLine();
-			System.out.println(str);
 			userList.add(str);
 		} while (!str.equals("END"));
 	}
 
 	/**
-	 * makes a connection with the users received from directory, saves the streams
-	 * and socket in list for future communication
+	 * faz a conexao com os utilizadores recebidos no diretorio, guarda as
+	 * streams e socket p/ comunicacao futura
 	 * 
 	 * @throws IOException
 	 */
-	private void connectToUsers() throws IOException { // PROBLEMA a conexao de um user que ja se tenha desconetado
+	private void connectToUsers() throws IOException {
 		requestRegisteredUsers();
-		connectionsList = new ArrayList<ClientConnector>(); // refaz a lista de conexoes
+		connectionsList = new ArrayList<ClientConnector>();
 		for (String s : userList) {
 			if (!s.equals("END")) {
 				String split[] = s.split(" ");
@@ -169,7 +154,7 @@ public class Client {
 
 		if (this.userPort == port && directorySocket.getLocalAddress().equals(ip))
 			return false; // impede a ligacao a si proprio
-		for (ClientConnector c : connectionsList) { // verifica se já não está ligado ao user NAO FUNCIONA ?
+		for (ClientConnector c : connectionsList) {
 			if (c.getSocket().getInetAddress().equals(ip) && c.getSocket().getPort() == port)
 				return false;
 		}
@@ -177,26 +162,24 @@ public class Client {
 	}
 
 	/**
-	 * makes a request to other users for a file with a certain keyword, saves the
-	 * files with a specific keyword
+	 * pede a outros utilizadores ficheiro/os que contenham a keyword
 	 * 
 	 * @param fileName
 	 */
 	public void sendFileNameRequest(String fileName) throws Exception {
 		word = new WordSearchMessage(fileName);
 		usersFilesMap = new HashMap<FileDetails, List<ClientConnector>>();
-		connectToUsers(); // Se se conseguiu ligar a pelo menos 1 user, envia o hashMap
+		connectToUsers(); //liga-se aos users
 		if (!connectionsList.isEmpty()) {
 			ArrayList<FileDetails> listFromPeer = new ArrayList<>();
 			for (ClientConnector c : connectionsList) {
 				c.getOutputStream().writeObject(word);
 				listFromPeer = (ArrayList<FileDetails>) c.getInputStream().readObject();
 				if (!listFromPeer.isEmpty()) {
-					// filesWithKeyword.addAll(listFromPeer);
 					for (FileDetails file : listFromPeer) {
 						if (usersFilesMap.containsKey(file)) {
 							usersFilesMap.get(file).add(c);
-						} else { // REVER !
+						} else {
 							ArrayList<ClientConnector> usersWithFile = new ArrayList<ClientConnector>();
 							usersWithFile.add(c);
 							usersFilesMap.put(file, usersWithFile);
@@ -214,21 +197,18 @@ public class Client {
 	}
 
 	public void requestFileParts(FileDetails fileDetails) throws InterruptedException {
-//		wholeFile = new byte[(int) fileDetails.getFileSize()];
 		createBlocks(fileDetails);
 		usersHavingFile = new ArrayList<ClientConnector>(usersFilesMap.get(fileDetails));
 		blocksToWrite = new ArrayList<FilePart>();
 
-		int numberOfThreads = usersHavingFile.size(); // creates 1 worker thread per user having file
-		System.out.println("Number of workers " + numberOfThreads);
+		int numberOfThreads = usersHavingFile.size(); // cria 1 workerThread por conexao
 		BlockThreadPool threadPool = new BlockThreadPool(numberOfThreads);
 		SingleBarrier singleBarrier = new SingleBarrier(blockList.size());
 		for (FileBlock fb : blockList) {
 			BlockGetterTask getFile = new BlockGetterTask(fb, singleBarrier, usersHavingFile, blocksToWrite);
 			threadPool.submit(getFile);
 		}
-
-		singleBarrier.barrierWait(); // waits while all tasks aren't finished
+		singleBarrier.barrierWait(); // espera que os blocos cheguem todos
 		System.out.println("Passed the barrier : " + blocksToWrite);
 		Collections.sort(blocksToWrite);
 		WriteFileThread writingThread = new WriteFileThread(fileDetails, blocksToWrite, filesFolder);
@@ -249,9 +229,7 @@ public class Client {
 			if (offset >= lastBlockOffset) {
 				block = new FileBlock(fd.getFileName(), lastBlockOffset, lastBlockLength, (int) fd.getFileSize());
 			} else {
-				block = new FileBlock(fd.getFileName(), offset, FILEBLOCKSIZE, (int) fd.getFileSize()); // 0-1023 ou
-																										// 1-1024 ? 1024
-																										// incluido ?
+				block = new FileBlock(fd.getFileName(), offset, FILEBLOCKSIZE, (int) fd.getFileSize());
 			}
 			offset = offset + FILEBLOCKSIZE;
 			blockList.add(block);
@@ -259,12 +237,7 @@ public class Client {
 	}
 
 
-	/**
-	 * TODO : Rever se o metodo deve ser static ou se deve estar aqui (mudar para
-	 * ClientDealer)
-	 * 
-	 * @return
-	 */
+
 	public static File[] getFilesFromFolder(String folderName) {
 		File folder = new File(folderName);
 		File[] files = folder.listFiles();
@@ -274,7 +247,7 @@ public class Client {
 
 
 	/**
-	 * closes directory socket
+	 * fecha a socket do diretorio
 	 * 
 	 * @throws IOException
 	 */

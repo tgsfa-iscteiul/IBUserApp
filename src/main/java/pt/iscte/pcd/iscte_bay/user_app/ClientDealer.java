@@ -29,15 +29,11 @@ public class ClientDealer extends Thread {
 	private ObjectOutputStream out;
 	private ObjectInputStream in;
 	private File[] files;
-	private BlockThreadPool threadPool;
-	private byte[] byteRequest;
-	private byte[] fileContents;
 	private String folderName;
 	private FileDisassemble disassemble;
 
 	public ClientDealer(Socket s, BlockThreadPool threadPool, String folderName) {
 		socket = s;
-		this.threadPool = threadPool;
 		this.folderName = folderName;
 	}
 
@@ -69,16 +65,11 @@ public class ClientDealer extends Thread {
 	private void serve() {
 		try {
 			while (true) {
-				files = Client.getFilesFromFolder(folderName); // getFilesFromFolder pode ser definido nesta classe?
+				files = Client.getFilesFromFolder(folderName);
 				Object request = new Object();
-				//				try {
 				synchronized (in) {
 					request = in.readObject();
 				}
-				//				Object request = in.readObject();
-				System.out.println("  Recebi pedido " + request.toString());
-				//				} catch(EOFException e) {
-				//				}
 				if (request instanceof WordSearchMessage) {
 					WordSearchMessage keyWord = (WordSearchMessage) request;
 					ArrayList<FileDetails> filesWithKeyword = new ArrayList<>();
@@ -93,29 +84,21 @@ public class ClientDealer extends Thread {
 					out.writeObject(filesWithKeyword);
 				} else if (request instanceof FileBlockRequestMessage) {
 					FileBlockRequestMessage requestedBlock = (FileBlockRequestMessage) request;
-					byteRequest = new byte[(int) (requestedBlock.getBlock().getLength())];
-					System.out.println(
-							"Got a request for file " + requestedBlock.getBlock().getName());
 					for (int j = 0; j < files.length; j++) {
 						if (files[j].getName().equals(requestedBlock.getBlock().getName())
 								&& files[j].length() == requestedBlock.getBlock().getFileTotalLength()){
 							disassemble = new FileDisassemble(files[j]);
-							fileContents = Files.readAllBytes(files[j].toPath());
 							FilePart p = fillRequest(requestedBlock);
-							if(p == null)
-								System.out.println("null filePart");
 							try {
 								synchronized (out) {
 									out.writeObject(p);
 								}
-//								out.writeObject(p);
 							} catch (Exception ex) {
 								System.out.println("Erro a enviar bloco: " + ex.getMessage() );
 								ex.printStackTrace();								
 							}
 
 							break;
-							//						threadPool.submit(new SendBlockTask(fileContents, requestedBlock, out));
 						}
 					}
 				}
@@ -141,14 +124,5 @@ public class ClientDealer extends Thread {
 		}
 		return null;
 	}
-	//		int offSet = (int) requestedBlock.getBlock().getOffset();
-	//		int size = (int) requestedBlock.getBlock().getLength();
-	//
-	//		for (int i = 0; i < size; i++) { // < ou <= ?
-	//			int j = i + offSet;
-	//			byteRequest[i] = fileContents[j];
-	//		}
-	//		FilePart f = new FilePart(byteRequest, offSet, size);
-	//		return f;
 
 }

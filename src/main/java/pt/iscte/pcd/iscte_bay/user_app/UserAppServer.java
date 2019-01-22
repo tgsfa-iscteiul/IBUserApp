@@ -31,18 +31,15 @@ public class UserAppServer extends Thread {
 	public UserAppServer(int port, String folderName) {
 		this.port = port;
 		this.folderName = folderName;
-		threadPool = new BlockThreadPool(5);
 	}
 
 	@Override
-	public void run() {  //TODO rever os try-catch
+	public void run() {
 		try {
 			serverSocket = new ServerSocket(port);
 		} catch (IOException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		System.out.println("Lancou ServerSocket de cliente: " + serverSocket);
 		try {
 			while (true) {
 				try {
